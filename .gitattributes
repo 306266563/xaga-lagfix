@@ -1,0 +1,4 @@
+# 模块脚本必须保持 LF，Windows 下拉成 CRLF 会让 sh 报错
+*.sh text eol=lf
+module.prop text eol=lf
+system.prop text eol=lf

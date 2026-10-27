@@ -1,0 +1,40 @@
+# 澎湃OS2 无响应/卡顿优化 · 系统属性注入
+# Redmi Note 11T Pro (xaga) / 6GB / HyperOS 2 / KernelSU·APatch
+# 挂载式模块, 只写属性不改分区, 删模块即恢复
+
+# ---------- lmkd 阈值 ----------
+# 原厂后两档 55296:900 / 80640:950 是 6GB 到不了的越界值, 导致后两档失效、
+# 只能靠 cw 无差别乱杀。改为六档(单位: 页 · 4KB), 整体上移约 25%, 让 lmkd 提前温和回收。
+ro.lmk.minfree_levels=38400:0,64000:100,128000:200,192000:250,256000:900,384000:950
+ro.lmk.enhance_batch_kill=false
+# 100→150: 给卡在回收里的进程更多响应时间, 减少误杀
+ro.lmk.kill_timeout_ms=150
+ro.lmk.use_minfree_levels=true
+# swap 低水位 40→20: 减少过早触发 cw 回收
+ro.lmk.swap_free_low_percentage=20
+# swappiness 源头值(原厂 100 会被 daemon 在运行中拉回 120)
+sys.mem.swappiness_on_launcher=100
+sys.mem.swappiness_on_start=100
+
+# ---------- 后台进程 ----------
+ro.sys.fw.bg_apps_limit=32
+ro.sys.fw.bservice_limit=16
+ro.sys.fw.bservice_age=10000
+ro.sys.fw.fservice_limit=16
+
+# ---------- 冻结 / 编译 ----------
+# privapp 权限白名单违规: 从崩溃降级为记日志
+ro.control_privapp_permissions=log
+# 关后台 dex2oat: 避免重编译抢内存后 SIGABRT
+pm.dexopt.bg-dexopt=verify
+pm.dexopt.first-boot=verify
+pm.dexopt.boot=verify
+pm.dexopt.install=verify
+pm.dexopt.inactive=verify
+pm.dexopt.ab-ota=verify
+
+# ---------- 渲染 / 输入 ----------
+# 减少 backpressure 掉帧 / 强制 GPU 渲染 / 提高输入采样上限
+debug.sf.disable_backpressure=1
+debug.hwui.force_gpu_rendering=true
+windowsmgr.max_events_per_sec=180

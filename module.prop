@@ -1,0 +1,6 @@
+id=xaga_lagfix
+name=澎湃OS2 无响应/卡顿优化
+version=v2.6
+versionCode=18
+author=TakuraTears & DeepSeek
+description=为 Redmi Note 11T Pro (xaga) 6GB 澎湃OS2 定制。校正 lmkd 阈值、接管 swappiness、拉满 ZRAM 至 6GB、关后台 dex2oat、优化 UFS IO 与缓存回写，持久化守护与一键自检，减少无响应与掉帧。
