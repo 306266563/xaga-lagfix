@@ -49,5 +49,4 @@ GPL-3.0
 
 ## 开发
 
-- TakuraTears（306266563）：需求、真机测试、日志采集
-- 代码与日志分析由 DeepSeek 协助完成
+TakuraTears（306266563）& DeepSeek
