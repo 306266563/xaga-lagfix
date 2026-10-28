@@ -3,18 +3,22 @@
 # 挂载式模块, 只写属性不改分区, 删模块即恢复
 
 # ---------- lmkd 阈值 ----------
-# 原厂后两档 55296:900 / 80640:950 是 6GB 到不了的越界值, 导致后两档失效、
-# 只能靠 cw 无差别乱杀。改为六档(单位: 页 · 4KB), 整体上移约 25%, 让 lmkd 提前温和回收。
-ro.lmk.minfree_levels=38400:0,64000:100,128000:200,192000:250,256000:900,384000:950
+# 单位是页(4KB)。六档依次对应 oom_score_adj 0 / 100 / 200 / 250 / 900 / 950,
+# 原厂值是 72 / 90 / 108 / 126 / 216 / 315 MB。
+# 这六档保持原厂不动: 曾放大 2-5 倍(最高档折算 1500MB), 6GB 机器永远空不出那么多,
+# lmkd 就一直按最高档杀缓存进程, 杀掉又被系统拉起, 反复循环吃满 CPU。
+ro.lmk.minfree_levels=18432:0,23040:100,27648:200,32256:250,55296:900,80640:950
 ro.lmk.enhance_batch_kill=false
 # 100→150: 给卡在回收里的进程更多响应时间, 减少误杀
 ro.lmk.kill_timeout_ms=150
-ro.lmk.use_minfree_levels=true
+# true→false: false 让 lmkd 盯 PSI(/proc/pressure/memory), 真卡了才杀;
+# true 则死守 minfree 水位, 空闲内存一低就无差别清缓存。
+ro.lmk.use_minfree_levels=false
 # swap 低水位 40→20: 减少过早触发 cw 回收
 ro.lmk.swap_free_low_percentage=20
-# swappiness 源头值(原厂 100 会被 daemon 在运行中拉回 120)
-sys.mem.swappiness_on_launcher=100
-sys.mem.swappiness_on_start=100
+# swappiness 源头值: 原厂 100 会被 daemon 在运行中拉回 120, 这里压到 60
+sys.mem.swappiness_on_launcher=60
+sys.mem.swappiness_on_start=60
 
 # ---------- 后台进程 ----------
 ro.sys.fw.bg_apps_limit=32

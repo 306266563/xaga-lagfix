@@ -1,53 +1,97 @@
-# 澎湃OS2 无响应/卡顿优化
+# 澎湃OS2 无响应/卡顿优化 · 使用手册
 
-Redmi Note 11T Pro（xaga）6GB 专用，HyperOS 2，KernelSU / APatch 挂载式模块。
-只写系统属性和 /proc、/sys 参数，不改系统分区，删模块即恢复。
+`xaga-lagfix` —— 给 Redmi Note 11T Pro（xaga，6GB）的澎湃OS2 治卡顿和无响应。抖音划视频卡、切应用转圈、输入法等半天、隔三差五弹「无响应」，都是它管的范围。
 
-## 做了什么
+装上之后不需要你做任何事。开机自动生效，之后每分钟核对一次，参数被系统改回去就补回来。
 
-- 修正 lmkd 阈值。原厂后两档 `55296:900`、`80640:950` 是 6GB 到不了的值，等于没用，改成六档 `38400:0` 到 `384000:950`（单位页，4KB）
-- 固定 swappiness 为 100。系统运行中会拉回 120，开机写一次，之后每分钟核对
-- zram 从系统默认的 4GB 重建为 6GB，和物理内存 1:1
-- 关闭后台 dex2oat，避免重编译抢内存
-- 调整 UFS 队列和缓存回写：mq-deadline、nr_requests 256、dirty 回写、vfs_cache_pressure
+> 只写系统属性和 `/proc`、`/sys` 里的参数，不动系统分区。删掉模块重启，一切回到原样。
 
-## 安装
+## 它做了什么
 
-管理器 → 模块 → 本地安装 → 选 zip → 重启。
+| 项目 | 改了什么 | 为什么 |
+|---|---|---|
+| **lmkd 判据** | `ro.lmk.use_minfree_levels` 改成 `false` | 让它盯 PSI（`/proc/pressure/memory`），真卡了才杀进程。原来的 `true` 是死守内存水位，空闲内存一低就不管三七二十一清缓存，缓存刚被杀又被系统拉起来，来回循环把 CPU 吃满 |
+| **lmkd 阈值** | 保持原厂六档（72 / 90 / 108 / 126 / 216 / 315 MB） | 曾经放大到最高 1500MB，6GB 机器永远空不出那么多，等于让 lmkd 一直按最高档杀。已回滚 |
+| **swappiness** | 100 → 60 | 原厂 100 换出太积极，前台要数据时又得从 ZRAM 解压回来，来回折腾。降到 60 少换出 |
+| **ZRAM** | 系统默认 4GB → 6GB，与物理内存 1:1 | 内存不够时先用压缩池顶住，不至于直接杀进程 |
+| **后台 dex2oat** | `bg-dexopt` / `boot` / `install` 等六项改成 `verify` | 关掉后台空闲重编译。之前日志里 dex2oat64 抢内存抢到 SIGABRT 崩过一次 |
+| **IO 与回写** | mq-deadline、`nr_requests` 256、dirty 回写水位、`vfs_cache_pressure` 50 | UFS 攒批量回写，减少小 IO 抖动；少回收 inode/dentry 缓存，切应用快一点 |
 
-## 验证
+另外还有两件不在参数层面的事：
 
-点模块卡片的「执行」，参数不对会当场修正。也可以手动查：
+- **守护进程**常驻，每分钟核一遍上面这些参数。小米的内存 daemon 会在运行中把 swappiness 拉回 120，靠它压回去
+- **一键自检**：管理器里点模块卡片的「执行」，会当场把所有参数核一遍，不对的立刻改，顺便报告谁在被反复杀
+
+## 装
+
+管理器（KernelSU / APatch）→ 模块 → 本地安装 → 选 zip → 重启。
+
+重启后等一分钟，让守护先把 ZRAM 重建完。
+
+## 装完怎么确认它在干活
+
+管理器里点模块卡片的「执行」按钮，最省事。会打印成这样：
 
 ```
-getprop sys.lmk.minfree_levels
-cat /proc/sys/vm/swappiness
-cat /proc/swaps
+======== xaga_lagfix v2.11 ========
+swappiness        : 60  [OK]
+sys.lmk.minfree   : 18432:0,23040:100,...  [OK]
+zram disksize     : 6442450944  [OK]
+swap 实际         :
+  /dev/block/zram0    partition  6291452   ...
+守护进程          : 运行中(心跳 23s 前)  [OK]
 ```
+
+也能自己跑命令核：
+
+```sh
+getprop sys.lmk.use_minfree_levels   # 应该是 false
+getprop sys.lmk.minfree_levels       # 应该是 18432:0,... 开头
+cat /proc/sys/vm/swappiness          # 应该是 60
+cat /proc/swaps                      # Size 应该是 6291452
+```
+
+`Size` 是 6291452（约 6GB）就说明 ZRAM 拉到位了。`Used` 会随时间涨，那是在用压缩池，正常。
+
+## 出问题时
+
+| 现象 | 怎么办 |
+|---|---|
+| 点「执行」显示 `zram disksize` 不是 6442450944 | ZRAM 没重建成功。运行中重建要把压缩页全解回物理内存，内存紧张时会卡死，所以模块故意不在运行中动手。**重启一次**即可 |
+| 点「执行」显示「守护进程：无心跳文件」 | 守护被系统清理了。点「执行」会自动重新拉起，约 45 秒后生效 |
+| swappiness 又变成 120 了 | 小米的 daemon 改的。等一分钟守护会压回去；急的话点「执行」 |
+| 还是卡 | 先看「执行」输出里那段「反复复活进程」。如果有某个应用被杀几十次，那是它自己跟系统拉锯，问题不在参数 |
+| 录屏、小米互传老是被杀 | 控制中心那两个磁贴被 SystemUI 反复拉起，被 lmkd 杀掉再拉起。把磁贴移出快捷设置就行 |
+| 开机慢、App 第一次点开慢 | 6GB 的常态，模块解决不了。dex2oat 已经关了，剩下的靠关自启动 |
+
+> 模块不管的部分要说清楚：它治不了第三方 App 自己占着内存不放、自己互相唤醒。QQ 加微信常驻就是 1.4GB，抖音刷视频本身还要 1GB 上下，6GB 物理内存是这个机器的硬约束。
 
 ## 卸载
 
 管理器里移除模块，重启。不改系统分区，卸载后完全恢复。
 
-## 注意
+## 文件都在哪
 
-- Scene 也会改 lmkd 阈值，两边都开会互相覆盖，建议关掉 Scene 的内存管理
-- 守护被系统清理后，点一次「执行」会重新拉起
-- thrashing 类 kill 走 `ro.lmk.thrashing_limit`，不受本模块的 minfree 影响
-- 录屏和小米互传常被控制中心磁贴反复拉起又被 lmkd 杀，把那两个磁贴移出快捷设置
-- 开机慢、App 首次启动慢是 6GB 的常态，模块解决不了
+```
+module.prop          模块信息
+system.prop          开机注入的系统属性
+post-fs-data.sh      开机早期写 /proc、/sys（一次）
+service.sh           用 setsid 拉起守护，然后退出
+guard.sh             守护本体：重建 ZRAM、常驻核对参数、写心跳
+lib.sh               公共函数，上面三个脚本共用
+action.sh            「执行」按钮跑的就是它
+uninstall.sh         卸载时清理日志和心跳文件
+```
 
-## 文件
+运行日志在 `/data/local/tmp/xaga_lagfix.log`，超过 4KB 自动裁到 200 行。
 
-`system.prop` `post-fs-data.sh` `service.sh` `guard.sh` `lib.sh` `action.sh` `uninstall.sh`
-
-`service.sh` 必须用 setsid 拉起守护，否则 APatch 在脚本退出时会把子进程一起清掉。
-
-## 许可
-
-GPL-3.0
+> `service.sh` 里必须用 `setsid` 拉起 `guard.sh`。直接 `( ... ) &` 的话，APatch / KernelSU 在脚本退出时会把这个进程组一起清掉，守护根本活不过开机——之前踩过这个坑，日志里只剩一行 start 就没了。
 
 ## 开发
 
 - TakuraTears（306266563）：需求、真机测试、日志采集
 - 代码与日志分析由 DeepSeek 协助完成
+
+## 许可
+
+GPL-3.0

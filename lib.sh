@@ -6,9 +6,12 @@ LOG=/data/local/tmp/xaga_lagfix.log
 HB=/data/local/tmp/xaga_lagfix.hb
 LOG_MAX=4096
 
+# ZRAM 6GB, 与物理内存 1:1
 ZRAM_SIZE=6442450944
-WANT_SWAPPINESS=100
-WANT_LMK="38400:0,64000:100,128000:200,192000:250,256000:900,384000:950"
+# 原厂 100 会被 daemon 拉回 120, 压到 60 减少主动换出
+WANT_SWAPPINESS=60
+# 页(4KB)为单位, 对应 oom_score_adj 0/100/200/250/900/950, 用原厂值
+WANT_LMK="18432:0,23040:100,27648:200,32256:250,55296:900,80640:950"
 
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
@@ -67,18 +70,18 @@ apply_all() {
         swapon /dev/block/zram0 2>/dev/null
         log "zram disksize: $cur -> $(cat /sys/block/zram0/disksize 2>/dev/null)"
       else
-        # 运行中不自动重建: swapoff 满 6GB 的 ZRAM 需把压缩页全解回物理内存,
-        # 内存不足时会卡死数分钟甚至触发 OOM 连环杀。只记警告, 想恢复请重启。
+        # 运行中不重建: swapoff 要把压缩页全解回物理内存, 内存紧张时会卡死数分钟,
+        # 甚至触发 OOM 连环杀。只记警告, 真要恢复请重启。
         log "WARN zram disksize=$cur (期望 $ZRAM_SIZE), 运行中不自动重建, 需要时请重启"
       fi
     fi
   fi
 
-  # swappiness + 源头属性(daemon 读这两个决定要不要拉回 120)
+  # swappiness 与源头属性(daemon 读这两个决定要不要拉回 120)
   put /proc/sys/vm/swappiness "$WANT_SWAPPINESS" swappiness
   setp sys.mem.swappiness_on_launcher "$WANT_SWAPPINESS"
   setp sys.mem.swappiness_on_start "$WANT_SWAPPINESS"
 
-  # lmkd 阈值: userspace lmkd 读 sys.lmk.minfree_levels(运行时值), 不是 ro.*
+  # lmkd 阈值: userspace lmkd 读运行时值 sys.lmk.minfree_levels, 不读 ro.*
   setp sys.lmk.minfree_levels "$WANT_LMK"
 }

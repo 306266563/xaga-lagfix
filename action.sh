@@ -9,11 +9,11 @@ MODDIR=/data/adb/modules/xaga_lagfix
 # lib.sh 读取失败时的兜底(避免整脚本崩)
 [ -z "$LOG" ] && LOG=/data/local/tmp/xaga_lagfix.log
 [ -z "$HB" ] && HB=/data/local/tmp/xaga_lagfix.hb
-[ -z "$WANT_SWAPPINESS" ] && WANT_SWAPPINESS=100
-[ -z "$WANT_LMK" ] && WANT_LMK="38400:0,64000:100,128000:200,192000:250,256000:900,384000:950"
+[ -z "$WANT_SWAPPINESS" ] && WANT_SWAPPINESS=60
+[ -z "$WANT_LMK" ] && WANT_LMK="18432:0,23040:100,27648:200,32256:250,55296:900,80640:950"
 [ -z "$ZRAM_SIZE" ] && ZRAM_SIZE=6442450944
 
-echo "======== xaga_lagfix v2.5 ========"
+echo "======== xaga_lagfix v2.11 ========"
 
 # ---------- swappiness ----------
 cur=$(cat /proc/sys/vm/swappiness 2>/dev/null)
@@ -39,7 +39,7 @@ else
   setprop sys.lmk.minfree_levels "$WANT_LMK" 2>/dev/null
   now=$(getprop sys.lmk.minfree_levels 2>/dev/null)
   if [ "$now" = "$WANT_LMK" ]; then
-    echo "sys.lmk.minfree   : $cur -> 已修正"
+    echo "sys.lmk.minfree   : $cur -> $now  [已修正]"
     log "sys.lmk.minfree_levels: $cur -> $now"
   else
     echo "sys.lmk.minfree   : $cur -> 写入失败(now=$now)  [失败]"

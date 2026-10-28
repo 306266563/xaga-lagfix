@@ -5,7 +5,7 @@
 MODDIR=${0%/*}
 . "$MODDIR/lib.sh"
 
-log "=== guard start (v2.6) ==="
+log "=== guard start (v2.11) ==="
 
 # 等系统建好 zram0 + mem daemon 跑完
 sleep 45
