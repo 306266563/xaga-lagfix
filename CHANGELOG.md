@@ -2,6 +2,18 @@
 
 > 每个版本的改动都记在这里。模块 zip 内不含本文件。
 
+## v2.14 - 2026-10-29
+
+### 修复
+- action.sh 的 events 临时文件改用带 pid 的唯一路径并加 trap 清理，并发执行时不再互相截断
+- 统计 events 窗口前先剥掉文件里的 NUL 字节；窗口跨度超过 24 小时判为读数异常，不再输出错误数字（曾出现「覆盖约 29887726 分钟」）
+- action.sh 的守护 ps 兜底改为精确匹配 `sh <模块路径>/guard.sh`，原先的宽匹配会把执行脚本的 shell 自身也算进去，误判成「守护仍在运行」
+- uninstall.sh 补删心跳文件与 events 临时文件
+
+### 改进
+- system.prop 删除四个不生效的 AOSP 后台进程属性（bg_apps_limit / bservice_limit / bservice_age / fservice_limit）。实测 AMS 实际运行 max_cached_processes=1024，被 MIUI 自己的 persist.sys.mms.bg_apps_limit=96 覆盖；后三个是 Android 5/6 时代的参数，Android 14 不再读取
+- 精简各脚本注释；module.prop 的 description 收到一句
+
 ## v2.13 - 2026-10-29
 
 ### 新增

@@ -13,9 +13,18 @@ WANT_SWAPPINESS=60
 
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
-# 日志超过 LOG_MAX 字节时裁到最近 200 行
+# 日志超 LOG_MAX 字节时裁到最近 200 行
 trim_log() {
   [ -f "$LOG" ] || return 0
+  # 强制重启后 f2fs 可能把日志恢复成一整段 NUL(长度对、内容全零),
+  # 这种内容 tail 出来就是满屏空白, 先剥掉
+  nb=$(wc -c < "$LOG" 2>/dev/null)
+  [ -z "$nb" ] && return 0
+  nz=$(tr -d '\000' < "$LOG" 2>/dev/null | wc -c)
+  if [ "$nb" != "$nz" ]; then
+    tr -d '\000' < "$LOG" > "$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG" 2>/dev/null
+    log "日志含 NUL, 已剥离 ($nb -> $nz 字节)"
+  fi
   size=$(wc -c < "$LOG" 2>/dev/null)
   [ -z "$size" ] && return 0
   [ "$size" -lt "$LOG_MAX" ] && return 0
@@ -68,8 +77,7 @@ apply_all() {
         swapon /dev/block/zram0 2>/dev/null
         log "zram disksize: $cur -> $(cat /sys/block/zram0/disksize 2>/dev/null)"
       else
-        # 运行中不重建: swapoff 要把压缩页全解回物理内存, 内存紧张时会卡死数分钟,
-        # 甚至触发 OOM 连环杀。只记警告, 真要恢复请重启。
+        # 运行中不重建: swapoff 要把压缩页全解回物理内存, 内存紧张时会卡死甚至 OOM。
         log "WARN zram disksize=$cur (期望 $ZRAM_SIZE), 运行中不自动重建, 需要时请重启"
       fi
     fi

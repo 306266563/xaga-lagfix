@@ -5,13 +5,10 @@
 MODDIR=${0%/*}
 . "$MODDIR/lib.sh"
 
-log "=== guard start (v2.13) ==="
+log "=== guard start (v2.14) ==="
 
-# ZRAM 重建必须赶在系统刚把 zram0 挂上 swap 的那一刻。
-# 系统在开机约 80 秒把 zram0 设为 4GB 并 swapon, 此时里面一页都还没有,
-# swapoff 秒成、零风险。等久了系统按原厂 swappiness 120 把内存陆续换进去,
-# swapoff 要把压缩页全部解回物理内存, 空闲不够直接失败, 重建跳空(10-28 故障)。
-# 判据: zram0 出现在 /proc/swaps 即系统已挂完, 最多等 120 秒。
+# ZRAM 重建必须赶在 zram0 刚挂上 swap 时 —— 里面还没换出页, swapoff 零风险;
+# 等久了压缩页解不回物理内存会跳空。判据: zram0 出现在 /proc/swaps, 最多等 120 秒。
 n=0
 while [ "$n" -lt 120 ]; do
   grep -q zram0 /proc/swaps 2>/dev/null && { sleep 2; break; }

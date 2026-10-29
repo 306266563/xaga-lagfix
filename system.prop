@@ -1,35 +1,26 @@
 # 澎湃OS2 无响应/卡顿优化 · 系统属性注入
-# Redmi Note 11T Pro (xaga) / 6GB / HyperOS 2 / KernelSU·APatch
+# Redmi Note 11T Pro (xaga) / 6GB / HyperOS 2 / APatch
 # 挂载式模块, 只写属性不改分区, 删模块即恢复
 
-# ---------- lmkd 阈值 ----------
-# 单位是页(4KB)。六档依次对应 oom_score_adj 0 / 100 / 200 / 250 / 900 / 950,
-# 原厂值是 72 / 90 / 108 / 126 / 216 / 315 MB。
-# 这六档保持原厂不动: 曾放大 2-5 倍(最高档折算 1500MB), 6GB 机器永远空不出那么多,
-# lmkd 就一直按最高档杀缓存进程, 杀掉又被系统拉起, 反复循环吃满 CPU。
+# ---------- lmkd ----------
+# 六档单位是页(4KB), 对应 oom_score_adj 0/100/200/250/900/950。保持原厂:
+# 曾放大 2-5 倍, 6GB 机器空不出那么多, lmkd 一直按最高档杀, 杀了又被拉起。
 ro.lmk.minfree_levels=18432:0,23040:100,27648:200,32256:250,55296:900,80640:950
 ro.lmk.enhance_batch_kill=false
-# 100→150: 给卡在回收里的进程更多响应时间, 减少误杀
+# 100→150: 给卡在回收里的进程更多响应时间
 ro.lmk.kill_timeout_ms=150
-# true→false: false 让 lmkd 盯 PSI(/proc/pressure/memory), 真卡了才杀;
-# true 则死守 minfree 水位, 空闲内存一低就无差别清缓存。
+# false: 盯 PSI(/proc/pressure/memory), 真卡了才杀; true: 死守 minfree 水位
 ro.lmk.use_minfree_levels=false
-# swap 低水位 40→20: 减少过早触发 cw 回收
+# swap 低水位 40→20: 减少过早触发回收
 ro.lmk.swap_free_low_percentage=20
-# swappiness 源头值: 原厂 100 会被 daemon 在运行中拉回 120, 这里压到 60
+# 源头值: 原厂 100 会被 daemon 拉回 120, 压到 60
 sys.mem.swappiness_on_launcher=60
 sys.mem.swappiness_on_start=60
-
-# ---------- 后台进程 ----------
-ro.sys.fw.bg_apps_limit=32
-ro.sys.fw.bservice_limit=16
-ro.sys.fw.bservice_age=10000
-ro.sys.fw.fservice_limit=16
 
 # ---------- 冻结 / 编译 ----------
 # privapp 权限白名单违规: 从崩溃降级为记日志
 ro.control_privapp_permissions=log
-# 关后台 dex2oat: 避免重编译抢内存后 SIGABRT
+# 关后台 dex2oat, 避免重编译抢内存
 pm.dexopt.bg-dexopt=verify
 pm.dexopt.first-boot=verify
 pm.dexopt.boot=verify
@@ -38,7 +29,6 @@ pm.dexopt.inactive=verify
 pm.dexopt.ab-ota=verify
 
 # ---------- 渲染 / 输入 ----------
-# 减少 backpressure 掉帧 / 强制 GPU 渲染 / 提高输入采样上限
 debug.sf.disable_backpressure=1
 debug.hwui.force_gpu_rendering=true
 windowsmgr.max_events_per_sec=180

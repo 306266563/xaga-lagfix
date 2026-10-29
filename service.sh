@@ -1,7 +1,6 @@
 #!/system/bin/sh
-# service 阶段: 只负责用 setsid 拉起 guard.sh 后退出。
-# 不能直接 ( ... ) & —— APatch/KSU 在脚本结束后会清理其子进程组,
-# 后台逻辑会被连带杀掉(实测只剩 start 日志, 没有 sleep 循环)。
+# service 阶段: 用 setsid 拉起 guard.sh 后退出。
+# 不能直接 ( ... ) & —— APatch/KSU 在脚本结束后会清理子进程组, 后台逻辑会被连带杀掉。
 
 MODDIR=${0%/*}
 

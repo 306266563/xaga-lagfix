@@ -1,25 +1,22 @@
 #!/system/bin/sh
-# 一键应用参数 + 显示状态 + 复活守护
-# 用途: 管理器里模块卡片的「执行 / Action」按钮; 也可手动 sh 运行
-# 不改 ZRAM(需重启才安全重建), 只检查并报告
-#
-# v2.13 起自检面板分成三个「谁在杀进程」的视角, 因为实测发现动手的不是内核:
-#   MIUI 视角  killinfo          —— MIUI 自己的水位机制, 实测占绝对多数
-#   内核视角  lowmemorykiller    —— 模块调参真正影响的那一侧
-#   AMS 视角  am_kill            —— 系统进程管理, 带杀死原因
-# 另外补上 PSI 压力、内存与换页累计、拉起次数与短命进程、ANR。
+# 一键自检 + 应用参数 + 复活守护。管理器 Action 按钮或手动 sh 运行。
+# 不改 ZRAM(运行中重建不安全), 只检查并报告。
+# 杀进程分三个视角看, 因为它们不是同一伙人:
+#   killinfo        MIUI 水位机制 —— 实测占绝对多数
+#   lowmemorykiller 内核 lmkd    —— 模块调参影响的那一侧
+#   am_kill         AMS          —— 带杀死原因
 
 MODDIR=/data/adb/modules/xaga_lagfix
 [ -f "$MODDIR/lib.sh" ] && . "$MODDIR/lib.sh"
 
-# lib.sh 读取失败时的兜底(避免整脚本崩)
+# lib.sh 读取失败时的兜底
 [ -z "$LOG" ] && LOG=/data/local/tmp/xaga_lagfix.log
 [ -z "$HB" ] && HB=/data/local/tmp/xaga_lagfix.hb
 [ -z "$WANT_SWAPPINESS" ] && WANT_SWAPPINESS=60
 [ -z "$ZRAM_SIZE" ] && ZRAM_SIZE=6442450944
 command -v log >/dev/null 2>&1 || log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
-echo "======== xaga_lagfix v2.13 ========"
+echo "======== xaga_lagfix v2.14 ========"
 
 # ---------- 参数 ----------
 echo "---- 参数 ----"
@@ -38,7 +35,7 @@ else
   fi
 fi
 
-# lmkd 阈值只报告不设置: 系统自己会动态重算, 写回去只会来回抢写
+# lmkd 阈值只报告: 系统每分钟自己重算, 写回去只会来回抢写
 cur=$(getprop sys.lmk.minfree_levels 2>/dev/null)
 echo "  sys.lmk.minfree   ${cur:-未设置}  [系统自管]"
 
@@ -51,7 +48,7 @@ for p in sys.mem.swappiness_on_launcher sys.mem.swappiness_on_start; do
   fi
 done
 
-# ---------- ZRAM(只报告, 不重建) ----------
+# ---------- ZRAM(只报告) ----------
 zsize=$(cat /sys/block/zram0/disksize 2>/dev/null)
 if [ -z "$zsize" ]; then
   echo "  zram disksize     读不到(zram0 不存在?)  [异常]"
@@ -62,11 +59,10 @@ else
   log "WARN zram disksize=$zsize (期望 $ZRAM_SIZE), 需重启重建"
 fi
 
-# 压缩算法: 方括号里的是当前生效的
+# 方括号里的是当前生效的算法
 zalg=$(cat /sys/block/zram0/comp_algorithm 2>/dev/null)
 [ -n "$zalg" ] && echo "  压缩算法          $zalg"
 
-# swap 占用只报「已用 / 总量」
 set -- $(awk 'NR==2{print $3, $4}' /proc/swaps 2>/dev/null)
 if [ -n "$1" ] && [ "$1" -gt 0 ] 2>/dev/null; then
   echo "  swap 占用         $2 / $1 kB  ($(( $2 * 100 / $1 ))%)"
@@ -74,7 +70,7 @@ else
   echo "  swap 占用         无"
 fi
 
-# ---------- 守护存活: 优先看心跳, ps 兜底 ----------
+# ---------- 守护存活 ----------
 echo "---- 守护 ----"
 alive=0
 if [ -f "$HB" ]; then
@@ -94,13 +90,12 @@ else
   echo "  无心跳文件"
 fi
 
-# ps 兜底: 万一心跳没写成功但进程还在
-if [ "$alive" = "0" ] && ps -A -o ARGS 2>/dev/null | grep -q "guard.sh"; then
+# ps 兜底: 心跳没写成功但进程还在。必须精确匹配, 宽匹配会把执行本脚本的 shell 也算进去
+if [ "$alive" = "0" ] && ps -A -o ARGS 2>/dev/null | grep -qE "(^|[[:space:]])sh[[:space:]]+$MODDIR/guard\.sh$"; then
   echo "  (ps 显示 guard.sh 仍在运行)"
   alive=1
 fi
 
-# 复活守护(用 setsid 独立会话, 与 service.sh 同样的方式)
 if [ "$alive" = "0" ]; then
   if [ -f "$MODDIR/guard.sh" ]; then
     setsid sh "$MODDIR/guard.sh" >/dev/null 2>&1 &
@@ -111,14 +106,14 @@ if [ "$alive" = "0" ]; then
   fi
 fi
 
-# ---------- 内存与换页累计 ----------
+# ---------- 内存与换页 ----------
 echo "---- 内存 ----"
 awk '/^MemTotal:|^MemFree:|^MemAvailable:|^SwapTotal:|^SwapFree:/{printf "  %-14s %s kB\n", $1, $2}' /proc/meminfo 2>/dev/null
-# 换页累计用来判断「设备是不是在拿 zram 当内存使」: 数字大=频繁换出换入
+# 换页累计: 数字大说明设备在拿 zram 当内存使
 vm=$(awk '/^pswpin |^pswpout |^pgmajfault |^pgsteal_kswapd |^pgsteal_direct /{printf "%s=%s ", $1, $2}' /proc/vmstat 2>/dev/null)
 [ -n "$vm" ] && echo "  开机累计        $vm"
 
-# ---------- 压力(PSI) ----------
+# ---------- PSI ----------
 echo "---- 压力 PSI (some/full 的 avg10 avg60 avg300) ----"
 for p in memory cpu io; do
   f="/proc/pressure/$p"
@@ -134,28 +129,34 @@ for p in memory cpu io; do
   fi
 done
 
-# ---------- 一次性把 events 缓冲区落盘 ----------
-# events 缓冲区比 main 小得多, 保留更久; 下面所有统计都从这份文件读,
-# 避免反复跑 logcat。用 -v epoch 是为了能算进程存活时长。
-EV=/data/local/tmp/xaga_lagfix_events.tmp
+# ---------- events 缓冲区落盘 ----------
+# 下面所有事件统计都从这一份读, 避免反复跑 logcat; -v epoch 才能算进程存活时长。
+# 路径带 pid: 并发跑两个实例时共用固定路径会互相截断。
+EV="/data/local/tmp/xaga_lagfix_events.$$.tmp"
+trap 'rm -f "$EV"' EXIT INT TERM
 echo
 echo "(正在读取系统日志, 约需十几秒...)"
 logcat -d -b events -v epoch 2>/dev/null > "$EV"
+# 掉电重启后 f2fs 可能让文件混进 NUL, 先剔掉再统计
+tr -d '\000' < "$EV" > "$EV.c" 2>/dev/null && mv "$EV.c" "$EV" 2>/dev/null
 
 # ---------- 统计窗口 ----------
 if [ -s "$EV" ]; then
-  # 别直接拿第一行算时间: events 缓冲区首行是 "--------- beginning of events"
-  span=$(awk '!/^---------/ { if (f == "") f = $1 + 0; l = $1 + 0 } END { if (f > 0) printf "%d", l - f }' "$EV" 2>/dev/null)
-  if [ -n "$span" ] && [ "$span" -gt 0 ] 2>/dev/null; then
+  # 只认 epoch 量级($1 > 1e9)的行; auditd 等行打的是开机相对秒(如 0.328)
+  span=$(awk '!/^---------/ { t = $1 + 0; if (t > 1000000000) { if (f == 0) f = t; l = t } } END { if (f > 0 && l > f) printf "%d", l - f }' "$EV" 2>/dev/null)
+  # 超过 24 小时说明读到了脏数据, 报异常而不是报假数字
+  if [ -n "$span" ] && [ "$span" -gt 0 ] 2>/dev/null && [ "$span" -lt 86400 ]; then
     echo "---- 统计窗口 ----"
     echo "  events 缓冲区覆盖约 $(( span / 60 )) 分钟(重启后清零), 下面所有次数都在此窗口内"
+  else
+    echo "---- 统计窗口 ----"
+    echo "  events 窗口读数异常, 下面次数仅作参考"
   fi
 fi
 
 # ---------- 被杀: MIUI 视角 ----------
-# killinfo 由 MIUI 自己打(pid 433), 字段:
+# killinfo 由 MIUI 自己打(pid 433), 字段序:
 #   [pid, 包名, uid, adj, ?, rss, ?, MemTotal, MemFree, ..., mem_some, mem_full, io_some, io_full, cpu_some]
-# 实测杀进程的绝大多数来自这里
 echo "---- 被杀: MIUI 视角 (killinfo) ----"
 if [ -s "$EV" ]; then
   kin=$(grep -c "killinfo" "$EV" 2>/dev/null)
@@ -168,7 +169,7 @@ else
 fi
 
 # ---------- 被杀: 内核视角 ----------
-# 这条才是模块调参真正影响的一侧; 只要这里计数很低, 说明瓶颈不在内核
+# 这条才是模块调参真正影响的一侧; 计数低说明瓶颈不在内核
 echo "---- 被杀: 内核视角 (lowmemorykiller) ----"
 lk=$(logcat -d -s lowmemorykiller 2>/dev/null | grep -oE "Kill '[^']+'" | sed "s/Kill '//;s/'//")
 if [ -n "$lk" ]; then
@@ -178,7 +179,7 @@ else
 fi
 
 # ---------- 被杀: AMS 视角 ----------
-# am_kill 的 reason 会直接写明是谁下的手, 例如 MiuiMemoryService(started-services)
+# reason 直接写明是谁下的手, 如 MiuiMemoryService(started-services)
 echo "---- 被杀: AMS 视角 (am_kill) ----"
 if [ -s "$EV" ]; then
   akn=$(grep -c "am_kill" "$EV" 2>/dev/null)
@@ -201,7 +202,7 @@ if [ -s "$EV" ]; then
     | awk -F, 'NF>=4{gsub(/^[ \t]+|[ \t]+$/,"",$4); print $4}' \
     | sort | uniq -c | sort -rn | head -5 | sed 's/^/    /'
 
-  # 存活时长: 把 am_proc_start 与 am_proc_died 按 pid 配对
+  # 存活时长: am_proc_start 与 am_proc_died 按 pid 配对
   echo "  短命进程(拉起后 30 秒内就被杀, 按次数):"
   awk '
     {
@@ -248,13 +249,12 @@ else
   echo "  次数: 0"
 fi
 
-# ---------- 清理临时文件 ----------
 rm -f "$EV" 2>/dev/null
 
 # ---------- 最近日志 ----------
 echo "---- 最近日志 ----"
 if [ -f "$LOG" ]; then
-  tail -n 8 "$LOG" 2>/dev/null | sed "s/^/  /"
+  tr -d '\000' < "$LOG" 2>/dev/null | tail -n 8 | sed "s/^/  /"
 else
   echo "  (无日志, guard.sh 可能未执行)"
 fi
