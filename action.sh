@@ -12,11 +12,11 @@ MODDIR=/data/adb/modules/xaga_lagfix
 # lib.sh 读取失败时的兜底
 [ -z "$LOG" ] && LOG=/data/local/tmp/xaga_lagfix.log
 [ -z "$HB" ] && HB=/data/local/tmp/xaga_lagfix.hb
-[ -z "$WANT_SWAPPINESS" ] && WANT_SWAPPINESS=60
+[ -z "$WANT_SWAPPINESS" ] && WANT_SWAPPINESS=100
 [ -z "$ZRAM_SIZE" ] && ZRAM_SIZE=6442450944
 command -v log >/dev/null 2>&1 || log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
-echo "======== xaga_lagfix v2.14 ========"
+echo "======== xaga_lagfix v2.15 ========"
 
 # ---------- 参数 ----------
 echo "---- 参数 ----"

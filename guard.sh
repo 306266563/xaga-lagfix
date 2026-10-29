@@ -5,7 +5,7 @@
 MODDIR=${0%/*}
 . "$MODDIR/lib.sh"
 
-log "=== guard start (v2.14) ==="
+log "=== guard start (v2.15) ==="
 
 # ZRAM 重建必须赶在 zram0 刚挂上 swap 时 —— 里面还没换出页, swapoff 零风险;
 # 等久了压缩页解不回物理内存会跳空。判据: zram0 出现在 /proc/swaps, 最多等 120 秒。

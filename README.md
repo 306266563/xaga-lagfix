@@ -33,10 +33,10 @@
 管理器里点模块卡片的「执行」按钮，最省事。会打印成这样：
 
 ```
-======== xaga_lagfix v2.14 ========
+======== xaga_lagfix v2.15 ========
 ---- 参数 ----
-  swappiness        60  [OK]
-  sys.lmk.minfree   18432:0,23040:100,...  [系统自管]
+  swappiness        100  [OK]
+  sys.lmk.minfree   38400:0,64000:100,...  [系统自管]
   zram disksize     6442450944  [OK]
   压缩算法          lzo lzo-rle [lz4] zstd
   swap 占用         3714940 / 6291452 kB  (59%)
@@ -76,16 +76,16 @@
 ---- ANR ----
   次数: 0
 ---- 最近日志 ----
-  [10-29 11:24:24] === guard start (v2.14) ===
+  [10-29 11:24:24] === guard start (v2.15) ===
 ================================
 ```
 
 也能自己跑命令核：
 
 ```sh
-getprop sys.lmk.use_minfree_levels   # 应该是 false
+getprop sys.lmk.use_minfree_levels   # 应该是 true
 getprop sys.lmk.minfree_levels       # 值由系统自己给，模块不干预
-cat /proc/sys/vm/swappiness          # 应该是 60
+cat /proc/sys/vm/swappiness          # 应该是 100
 cat /proc/swaps                      # Size 应该是 6291452
 ```
 

@@ -8,8 +8,8 @@ LOG_MAX=4096
 
 # ZRAM 6GB, 与物理内存 1:1
 ZRAM_SIZE=6442450944
-# 原厂 100 会被 daemon 拉回 120, 压到 60 减少主动换出
-WANT_SWAPPINESS=60
+# 内存不够优先压进 ZRAM, 而非直接杀进程(daemon 会把 100 拉回 120, 这里持续纠回)
+WANT_SWAPPINESS=100
 
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 

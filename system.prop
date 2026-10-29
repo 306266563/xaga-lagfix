@@ -3,19 +3,20 @@
 # 挂载式模块, 只写属性不改分区, 删模块即恢复
 
 # ---------- lmkd ----------
-# 六档单位是页(4KB), 对应 oom_score_adj 0/100/200/250/900/950。保持原厂:
-# 曾放大 2-5 倍, 6GB 机器空不出那么多, lmkd 一直按最高档杀, 杀了又被拉起。
-ro.lmk.minfree_levels=18432:0,23040:100,27648:200,32256:250,55296:900,80640:950
+# 六档单位是页(4KB), 对应 oom_score_adj 0/100/200/250/900/950。
+# 原厂后两档(55296 / 80640 页)在 6GB 机器上到不了, 会让后两档失效;
+# 整体抬高让 lmkd 提前温和回收, 前台要内存时有东西可用。
+ro.lmk.minfree_levels=38400:0,64000:100,128000:200,192000:250,256000:900,384000:950
 ro.lmk.enhance_batch_kill=false
 # 100→150: 给卡在回收里的进程更多响应时间
 ro.lmk.kill_timeout_ms=150
-# false: 盯 PSI(/proc/pressure/memory), 真卡了才杀; true: 死守 minfree 水位
-ro.lmk.use_minfree_levels=false
+# true: 按上面六档水位杀; false: 改盯 PSI 等真卡了才杀(实测前台会被 kswapd 拖住)
+ro.lmk.use_minfree_levels=true
 # swap 低水位 40→20: 减少过早触发回收
 ro.lmk.swap_free_low_percentage=20
-# 源头值: 原厂 100 会被 daemon 拉回 120, 压到 60
-sys.mem.swappiness_on_launcher=60
-sys.mem.swappiness_on_start=60
+# 源头值(原厂 100 会被 daemon 在运行中拉回 120)。取 100: 内存不够优先压进 ZRAM, 而非直接杀进程
+sys.mem.swappiness_on_launcher=100
+sys.mem.swappiness_on_start=100
 
 # ---------- 冻结 / 编译 ----------
 # privapp 权限白名单违规: 从崩溃降级为记日志
