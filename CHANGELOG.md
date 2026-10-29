@@ -2,6 +2,19 @@
 
 > 每个版本的改动都记在这里。模块 zip 内不含本文件。
 
+## v2.13 - 2026-10-29
+
+### 新增
+- 自检面板补上「谁在杀进程」的三个视角：MIUI 的 killinfo、内核 lowmemorykiller、AMS 的 am_kill。实测同一个进程被 MIUI 杀了 1384 次、被内核杀了 108 次，只看内核视角会完全误判
+- 新增 PSI 压力表：memory / cpu / io 的 some 与 full，各带 avg10 / avg60 / avg300
+- 新增进程存活时长统计：把 am_proc_start 与 am_proc_died 按 pid 配对，列出「拉起后 30 秒内就被杀」的进程与最短存活
+- 新增内存与换页累计（pswpin / pswpout / pgmajfault / pgsteal_kswapd / pgsteal_direct）、ANR 计数、events 缓冲区覆盖窗口
+- 新增 zram 压缩算法显示
+
+### 改进
+- 自检时把 events 缓冲区一次性落盘再统一统计，不再反复调用 logcat
+- 统计窗口改为按 events 缓冲区首尾行计算，避开首行的 `--------- beginning of events` 分隔符
+
 ## v2.12 - 2026-10-29
 
 ### 修复

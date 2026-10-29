@@ -5,7 +5,7 @@
 MODDIR=${0%/*}
 . "$MODDIR/lib.sh"
 
-log "=== guard start (v2.12) ==="
+log "=== guard start (v2.13) ==="
 
 # ZRAM 重建必须赶在系统刚把 zram0 挂上 swap 的那一刻。
 # 系统在开机约 80 秒把 zram0 设为 4GB 并 swapon, 此时里面一页都还没有,
