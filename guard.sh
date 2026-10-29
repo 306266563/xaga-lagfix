@@ -7,8 +7,8 @@ MODDIR=${0%/*}
 
 log "=== guard start (v2.15) ==="
 
-# ZRAM 重建必须赶在 zram0 刚挂上 swap 时 —— 里面还没换出页, swapoff 零风险;
-# 等久了压缩页解不回物理内存会跳空。判据: zram0 出现在 /proc/swaps, 最多等 120 秒。
+# ZRAM 重建必须在 zram0 刚挂上 swap 时进行: 此时无换出页, swapoff 无风险;
+# 延迟后压缩页解回物理内存会导致 OOM。判据: zram0 出现在 /proc/swaps, 最多等 120 秒。
 n=0
 while [ "$n" -lt 120 ]; do
   grep -q zram0 /proc/swaps 2>/dev/null && { sleep 2; break; }

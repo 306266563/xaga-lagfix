@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # 一键自检 + 应用参数 + 复活守护。管理器 Action 按钮或手动 sh 运行。
 # 不改 ZRAM(运行中重建不安全), 只检查并报告。
-# 杀进程分三个视角看, 因为它们不是同一伙人:
+# 杀进程分三个视角, 三者数据来源不同:
 #   killinfo        MIUI 水位机制 —— 实测占绝对多数
 #   lowmemorykiller 内核 lmkd    —— 模块调参影响的那一侧
 #   am_kill         AMS          —— 带杀死原因
@@ -109,7 +109,7 @@ fi
 # ---------- 内存与换页 ----------
 echo "---- 内存 ----"
 awk '/^MemTotal:|^MemFree:|^MemAvailable:|^SwapTotal:|^SwapFree:/{printf "  %-14s %s kB\n", $1, $2}' /proc/meminfo 2>/dev/null
-# 换页累计: 数字大说明设备在拿 zram 当内存使
+# 换页累计: 数字大表示设备在大量使用 zram
 vm=$(awk '/^pswpin |^pswpout |^pgmajfault |^pgsteal_kswapd |^pgsteal_direct /{printf "%s=%s ", $1, $2}' /proc/vmstat 2>/dev/null)
 [ -n "$vm" ] && echo "  开机累计        $vm"
 
@@ -169,13 +169,13 @@ else
 fi
 
 # ---------- 被杀: 内核视角 ----------
-# 这条才是模块调参真正影响的一侧; 计数低说明瓶颈不在内核
+# 模块调参影响的是这一侧; 计数低表示瓶颈不在内核
 echo "---- 被杀: 内核视角 (lowmemorykiller) ----"
 lk=$(logcat -d -s lowmemorykiller 2>/dev/null | grep -oE "Kill '[^']+'" | sed "s/Kill '//;s/'//")
 if [ -n "$lk" ]; then
   printf '%s\n' "$lk" | sort | uniq -c | sort -rn | head -6 | sed 's/^/    /'
 else
-  echo "    (无记录 — 内核侧基本没动手)"
+  echo "    (无记录)"
 fi
 
 # ---------- 被杀: AMS 视角 ----------

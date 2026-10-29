@@ -17,7 +17,7 @@ log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 trim_log() {
   [ -f "$LOG" ] || return 0
   # 强制重启后 f2fs 可能把日志恢复成一整段 NUL(长度对、内容全零),
-  # 这种内容 tail 出来就是满屏空白, 先剥掉
+  # 该内容直接输出为空白行, 需先剥离
   nb=$(wc -c < "$LOG" 2>/dev/null)
   [ -z "$nb" ] && return 0
   nz=$(tr -d '\000' < "$LOG" 2>/dev/null | wc -c)
@@ -89,5 +89,5 @@ apply_all() {
   setp sys.mem.swappiness_on_start "$WANT_SWAPPINESS"
 
   # lmkd 阈值不写: sys.lmk.minfree_levels 由系统自己动态重算(实测开机后每分钟一次),
-  # 模块写回去只会来回抢写。lmkd 的判据交给 ro.lmk.use_minfree_levels 与 PSI。
+  # 模块写回去只会来回抢写。lmkd 的判据由 ro.lmk.use_minfree_levels 决定。
 }

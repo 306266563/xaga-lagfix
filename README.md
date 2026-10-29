@@ -10,9 +10,9 @@
 
 | 项目 | 改了什么 | 为什么 |
 |---|---|---|
-| **lmkd 判据** | `ro.lmk.use_minfree_levels` 改成 `false` | 让它盯 PSI（`/proc/pressure/memory`），真卡了才杀进程。原来的 `true` 是死守内存水位，空闲内存一低就不管三七二十一清缓存，缓存刚被杀又被系统拉起来，来回循环把 CPU 吃满 |
-| **lmkd 阈值** | 运行期不写，交回系统 | 曾经把原厂六档当成「6GB 到不了的废值」放大到最高 1500MB，机器永远空不出那么多，等于让 lmkd 一直按最高档杀。回滚后还试过每分钟写回原厂值，但系统自己也在按实时压力重算，变成来回抢写，所以运行期彻底不碰。开机属性 `ro.lmk.minfree_levels` 保持原厂六档，与系统原值一致 |
-| **swappiness** | 100 → 60 | 原厂 100 换出太积极，前台要数据时又得从 ZRAM 解压回来，来回折腾。降到 60 少换出 |
+| **lmkd 判据** | `ro.lmk.use_minfree_levels` 保持 `true` | 按内存水位杀进程。改成 `false` 改盯 PSI 的版本实测前台会被回收线程拖住，微信、QQ 各出现一次输入 5 秒无响应 |
+| **lmkd 阈值** | `ro.lmk.minfree_levels` 整体抬高，最高档 384000 页（约 1.5GB） | 原厂后两档在 6GB 机器上到不了，会让后两档失效。抬高后 lmkd 提前温和回收，前台要内存时有东西可用。运行期不写 `sys.lmk.minfree_levels`，系统每分钟按实时压力自己重算 |
+| **swappiness** | 保持 100 | 内存不够时优先压进 ZRAM，而不是直接杀进程。降到 60 的版本实测前台被回收线程拖住 |
 | **ZRAM** | 系统默认 4GB → 6GB，与物理内存 1:1 | 内存不够时先用压缩池顶住，不至于直接杀进程 |
 | **后台 dex2oat** | `bg-dexopt` / `boot` / `install` 等六项改成 `verify` | 关掉后台空闲重编译。之前日志里 dex2oat64 抢内存抢到 SIGABRT 崩过一次 |
 | **IO 与回写** | mq-deadline、`nr_requests` 256、dirty 回写水位、`vfs_cache_pressure` 50 | UFS 攒批量回写，减少小 IO 抖动；少回收 inode/dentry 缓存，切应用快一点 |
@@ -124,7 +124,7 @@ uninstall.sh         卸载时清理日志和心跳文件
 
 运行日志在 `/data/local/tmp/xaga_lagfix.log`，超过 4KB 自动裁到 200 行。
 
-> `service.sh` 里必须用 `setsid` 拉起 `guard.sh`。直接 `( ... ) &` 的话，APatch / KernelSU 在脚本退出时会把这个进程组一起清掉，守护根本活不过开机——之前踩过这个坑，日志里只剩一行 start 就没了。
+> `service.sh` 里必须用 `setsid` 拉起 `guard.sh`。直接 `( ... ) &` 的话，APatch / KernelSU 在脚本退出时会把这个进程组一起清掉，守护无法存活到开机之后。
 
 ## 开发
 
