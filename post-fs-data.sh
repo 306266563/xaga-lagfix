@@ -16,8 +16,6 @@ echo 50 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null || true
 echo 1 > /proc/sys/vm/overcommit_memory 2>/dev/null || true
 # 允许回收 unevictable 页, 减少 compaction 唤醒
 echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null || true
-# swap 少预读, 减 ZRAM 环境换页抖动
-echo 0 > /proc/sys/vm/page-cluster 2>/dev/null || true
 
 # ---------- IO 调度 ----------
 # xaga 的 UFS 主盘是 sda/sdb/sdc(无 mmcblk0); 实测默认即 [mq-deadline], 写死兜底。

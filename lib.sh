@@ -10,8 +10,6 @@ LOG_MAX=4096
 ZRAM_SIZE=6442450944
 # 原厂 100 会被 daemon 拉回 120, 压到 60 减少主动换出
 WANT_SWAPPINESS=60
-# 页(4KB)为单位, 对应 oom_score_adj 0/100/200/250/900/950, 用原厂值
-WANT_LMK="18432:0,23040:100,27648:200,32256:250,55296:900,80640:950"
 
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
@@ -82,6 +80,6 @@ apply_all() {
   setp sys.mem.swappiness_on_launcher "$WANT_SWAPPINESS"
   setp sys.mem.swappiness_on_start "$WANT_SWAPPINESS"
 
-  # lmkd 阈值: userspace lmkd 读运行时值 sys.lmk.minfree_levels, 不读 ro.*
-  setp sys.lmk.minfree_levels "$WANT_LMK"
+  # lmkd 阈值不写: sys.lmk.minfree_levels 由系统自己动态重算(实测开机后每分钟一次),
+  # 模块写回去只会来回抢写。lmkd 的判据交给 ro.lmk.use_minfree_levels 与 PSI。
 }
