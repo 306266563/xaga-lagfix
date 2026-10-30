@@ -11,13 +11,21 @@ echo 10 > /proc/sys/vm/dirty_background_ratio 2>/dev/null || true
 echo 6000 > /proc/sys/vm/dirty_expire_centisecs 2>/dev/null || true
 echo 1500 > /proc/sys/vm/dirty_writeback_centisecs 2>/dev/null || true
 # 少回收 inode/dentry 缓存, 冷启动/切应用/滑列表更快
-echo 50 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null || true
+echo 30 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null || true
 # 减少 malloc 失败崩溃(dex2oat 曾因此 SIGABRT)
 echo 1 > /proc/sys/vm/overcommit_memory 2>/dev/null || true
 # 允许回收 unevictable 页, 少唤醒 compaction
 echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null || true
 # swap 少预读, 减 ZRAM 环境换页抖动
 echo 0 > /proc/sys/vm/page-cluster 2>/dev/null || true
+# kswapd 唤醒水位差 = MemTotal * 本值 / 10000; 取 10 时约 53 MB, 回收提前启动
+echo 10 > /proc/sys/vm/watermark_scale_factor 2>/dev/null || true
+# 空闲时后台整理碎片, 缓解高 order 连续块枯竭
+echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null || true
+# 保底空闲页, 减少分配路径上的直接回收
+echo 32768 > /proc/sys/vm/min_free_kbytes 2>/dev/null || true
+# 越大越少尝试碎片整理(避免无效 compaction 烧 CPU)
+echo 800 > /proc/sys/vm/extfrag_threshold 2>/dev/null || true
 
 # ---------- IO 调度 ----------
 # UFS 主盘 sda/sdb/sdc(无 mmcblk0; 默认即 mq-deadline, 这里写死兜底); nr_requests 128→256
