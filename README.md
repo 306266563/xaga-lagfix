@@ -10,12 +10,16 @@
 
 | 项目 | 改了什么 | 为什么 |
 |---|---|---|
-| **lmkd 判据** | `ro.lmk.use_minfree_levels` 保持 `true` | 按内存水位杀进程。改成 `false` 改盯 PSI 的版本实测前台会被回收线程拖住，微信、QQ 各出现一次输入 5 秒无响应 |
-| **lmkd 阈值** | `ro.lmk.minfree_levels` 整体抬高，最高档 384000 页（约 1.5GB） | 原厂后两档在 6GB 机器上到不了，会让后两档失效。抬高后 lmkd 提前温和回收，前台要内存时有东西可用。运行期不写 `sys.lmk.minfree_levels`，系统每分钟按实时压力自己重算 |
+| **内存回收时机** | `extra_free_kbytes` 31 MB → 192 MB、`min_free_kbytes` 9 MB → 64 MB、`watermark_scale_factor` 1 → 20 | 内核保留内存原厂合计仅约 40 MB，空闲内存跌破 40 MB 才开始回收，这时应用只能自己同步等待，系统界面会卡在换入路径上、触摸长时间无响应。抬到约 250 MB 让后台回收线程提前干活 |
 | **swappiness** | 保持 100 | 内存不够时优先压进 ZRAM，而不是直接杀进程。降到 60 的版本实测前台被回收线程拖住 |
 | **ZRAM** | 系统默认 4GB → 6GB，与物理内存 1:1 | 内存不够时先用压缩池顶住，不至于直接杀进程 |
+| **换页预读** | `page-cluster` 3 → 0 | 换入页在 ZRAM 里是散落的，预读 8 页通常只有 1 页真用上，剩下 7 页白解压 |
+| **内存碎片** | `compaction_proactiveness` 20、`extfrag_threshold` 800 | 空闲时后台整理碎片，少做无效整理烧 CPU |
+| **文件缓存** | `vfs_cache_pressure` 50 → 30 | 少回收 inode/dentry 缓存，切应用、滑列表快一点 |
+| **IO 与回写** | mq-deadline、`nr_requests` 256、dirty 回写水位 | UFS 攒批量回写，减少小 IO 抖动 |
 | **后台 dex2oat** | `bg-dexopt` / `boot` / `install` 等六项改成 `verify` | 关掉后台空闲重编译。之前日志里 dex2oat64 抢内存抢到 SIGABRT 崩过一次 |
-| **IO 与回写** | mq-deadline、`nr_requests` 256、dirty 回写水位、`vfs_cache_pressure` 50 | UFS 攒批量回写，减少小 IO 抖动；少回收 inode/dentry 缓存，切应用快一点 |
+
+> lmkd 走原厂逻辑。`system.prop` 里那几条 `ro.lmk.*` 保留但不起作用——lmkd 属 `class core`，开机 4.6 秒就已读完属性，而模块要等到 post-fs-data 阶段（约 60 秒后）才注入。
 
 另外还有两件不在参数层面的事：
 
@@ -33,7 +37,7 @@
 管理器里点模块卡片的「执行」按钮，最省事。会打印成这样：
 
 ```
-======== xaga_lagfix v2.16 ========
+======== xaga_lagfix v2.17 ========
 ---- 参数 ----
   swappiness        100  [OK]
   sys.lmk.minfree   38400:0,64000:100,...  [系统自管]
@@ -76,7 +80,7 @@
 ---- ANR ----
   次数: 0
 ---- 最近日志 ----
-  [10-30 18:30:55] === guard start (v2.16) ===
+  [10-30 18:30:55] === guard start (v2.17) ===
 ================================
 ```
 

@@ -18,12 +18,15 @@ echo 1 > /proc/sys/vm/overcommit_memory 2>/dev/null || true
 echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null || true
 # swap 少预读, 减 ZRAM 环境换页抖动
 echo 0 > /proc/sys/vm/page-cluster 2>/dev/null || true
-# kswapd 唤醒水位差 = MemTotal * 本值 / 10000; 取 10 时约 53 MB, 回收提前启动
-echo 10 > /proc/sys/vm/watermark_scale_factor 2>/dev/null || true
+# kswapd 唤醒水位差 = MemTotal * 本值 / 10000; 取 20 时约 107 MB, 回收提前启动
+echo 20 > /proc/sys/vm/watermark_scale_factor 2>/dev/null || true
 # 空闲时后台整理碎片, 缓解高 order 连续块枯竭
 echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null || true
 # 保底空闲页, 减少分配路径上的直接回收
-echo 32768 > /proc/sys/vm/min_free_kbytes 2>/dev/null || true
+echo 65536 > /proc/sys/vm/min_free_kbytes 2>/dev/null || true
+# kswapd 提前介入的额外余量: 原厂 31134 与 min_free 相加仅约 40 MB,
+# 实测 MemFree 掉到 38 MB 才回收, SystemUI 卡在内核页锁导致输入超时黑屏
+echo 196608 > /proc/sys/vm/extra_free_kbytes 2>/dev/null || true
 # 越大越少尝试碎片整理(避免无效 compaction 烧 CPU)
 echo 800 > /proc/sys/vm/extfrag_threshold 2>/dev/null || true
 

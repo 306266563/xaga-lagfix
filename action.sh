@@ -16,7 +16,7 @@ MODDIR=/data/adb/modules/xaga_lagfix
 [ -z "$ZRAM_SIZE" ] && ZRAM_SIZE=6442450944
 command -v log >/dev/null 2>&1 || log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
 
-echo "======== xaga_lagfix v2.16 ========"
+echo "======== xaga_lagfix v2.17 ========"
 
 # ---------- 参数 ----------
 echo "---- 参数 ----"

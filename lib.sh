@@ -17,11 +17,16 @@ ZRAM_SIZE=6442450944
 WANT_SWAPPINESS=100
 # kswapd 唤醒水位差 = MemTotal * 本值 / 10000
 # 原厂值 1 时水位差约 5 MB, kswapd 几乎无提前量, 回收全压在分配方身上(direct reclaim)
-WANT_WATERMARK_SCALE_FACTOR=10
+WANT_WATERMARK_SCALE_FACTOR=20
 # 空闲时后台整理碎片, 缓解高 order 连续块枯竭
 WANT_COMPACTION_PROACTIVENESS=20
 # 保底空闲页, 减少分配路径上的直接回收
-WANT_MIN_FREE_KBYTES=32768
+WANT_MIN_FREE_KBYTES=65536
+# kswapd 提前介入的额外余量(叠加在 low 水位上)。
+# 实测设备上 MIUI 值 31134 与本文件 min_free_kbytes 相加仅约 40 MB, MemFree 掉到
+# 38 MB 才开始回收, 分配方只能自己做 direct reclaim —— SystemUI 因此卡在内核
+# lock_page_maybe_drop_mmap(STAT=D)、输入分发超时黑屏。抬到 192 MB 让 kswapd 提前干活。
+WANT_EXTRA_FREE_KBYTES=196608
 # 值越小越舍不得回收 inode/dentry 缓存
 WANT_VFS_CACHE_PRESSURE=30
 # 值越大越少尝试碎片整理(避免无效 compaction 烧 CPU)
@@ -124,6 +129,7 @@ apply_all() {
   put /proc/sys/vm/watermark_scale_factor "$WANT_WATERMARK_SCALE_FACTOR" watermark_scale_factor
   put /proc/sys/vm/compaction_proactiveness "$WANT_COMPACTION_PROACTIVENESS" compaction_proactiveness
   put /proc/sys/vm/min_free_kbytes "$WANT_MIN_FREE_KBYTES" min_free_kbytes
+  put /proc/sys/vm/extra_free_kbytes "$WANT_EXTRA_FREE_KBYTES" extra_free_kbytes
   put /proc/sys/vm/vfs_cache_pressure "$WANT_VFS_CACHE_PRESSURE" vfs_cache_pressure
   put /proc/sys/vm/extfrag_threshold "$WANT_EXTFRAG_THRESHOLD" extfrag_threshold
   put /proc/sys/vm/page-cluster "$WANT_PAGE_CLUSTER" page-cluster
@@ -138,4 +144,7 @@ apply_all() {
   # 模块写回去只会来回抢写。
   # ro.lmk.* 是开机属性, lmkd 属 class core、boottime 约 4.6 秒就已启动,
   # 而模块 system.prop 在 post-fs-data 阶段(约 60 秒后)才注入, 改这些值不生效。
+  # 注意: system.prop 里仍写着 ro.lmk.use_minfree_levels / 抬高的 minfree_levels,
+  # 按上述时序对运行中的 lmkd 没有作用(实测设备上仍是原厂 false + 原厂六档)。
+  # 真正运行期生效的是本函数的 /proc/sys/vm/* 与 sys.mem.* 属性。
 }
