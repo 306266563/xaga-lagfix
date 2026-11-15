@@ -13,8 +13,14 @@ LOG_MAX=4096
 ZRAM_SIZE=6442450944
 
 # ---------- 内存回收与回写 ----------
-# 内存不够优先压进 ZRAM, 而非直接杀进程(daemon 会把 100 拉回 120, 这里持续纠回)
-WANT_SWAPPINESS=100
+# 内存不够优先压进 ZRAM, 而非直接杀进程(daemon 会把它往高里拉, 这里持续纠回)
+# 2026-11-15 由 100 降到 60: 100 时内核把 SystemUI/输入法/system_server 也当冷页换出去,
+# 触摸、弹键盘这些一操作就要用的场景, 主线程只能 D 状态等 zram 解压, 5 秒超时 ANR
+# (11-15 10:57 抖音 trace: VmSwap 756104 kB, 主线程 5 个 D 状态)。
+# 降到 60 后同步回收占比 38% -> 3.6%, 等内存时间 10.16% -> 1.00%。
+# 尚未验证: 60 与 100 的 A/B 对照没做成(两次测试起跑线差 473 MB, 均 0 ANR),
+# 目前依据是机制分析而非受控实验; 若体感变差, 改回 100 即可。
+WANT_SWAPPINESS=60
 # kswapd 唤醒水位差 = MemTotal * 本值 / 10000
 # 原厂值 1 时水位差约 5 MB, kswapd 几乎无提前量, 回收全压在分配方身上(direct reclaim)
 WANT_WATERMARK_SCALE_FACTOR=20
@@ -26,7 +32,9 @@ WANT_MIN_FREE_KBYTES=65536
 # 实测设备上 MIUI 值 31134 与本文件 min_free_kbytes 相加仅约 40 MB, MemFree 掉到
 # 38 MB 才开始回收, 分配方只能自己做 direct reclaim —— SystemUI 因此卡在内核
 # lock_page_maybe_drop_mmap(STAT=D)、输入分发超时黑屏。抬到 192 MB 让 kswapd 提前干活。
-WANT_EXTRA_FREE_KBYTES=196608
+# 2026-11-15 由 192 MB 降到 96 MB: 192 MB 时 MemAvailable 比上一版低 150-700 MB,
+# 保留内存是从应用嘴里抠的, 挤掉 page cache 反而让换出更狠。96 MB 仍是原厂 31 MB 的三倍。
+WANT_EXTRA_FREE_KBYTES=98304
 # 值越小越舍不得回收 inode/dentry 缓存
 WANT_VFS_CACHE_PRESSURE=30
 # 值越大越少尝试碎片整理(避免无效 compaction 烧 CPU)

@@ -5,7 +5,7 @@
 MODDIR=${0%/*}
 . "$MODDIR/lib.sh"
 
-log "=== guard start (v2.17) ==="
+log "=== guard start (v2.18) ==="
 
 # ZRAM 重建必须在 zram0 刚挂上 swap 时进行: 此时无换出页, swapoff 无风险;
 # 延迟后压缩页解回物理内存会导致 OOM。判据: zram0 出现在 /proc/swaps, 最多等 120 秒。
@@ -27,8 +27,12 @@ apply_all 0
 trim_log
 
 # 常驻核对, 被改回就补
+# 每轮重新载入 lib.sh: 常量在进程启动时就被读进内存, 只改文件不重载的话会一直用
+# 旧值(本版之前的行为), 调参必须 kill 掉本进程才生效, 而且没有任何提示。
+# 载入失败(文件语法错误/被删)时静默跳过, 沿用上一轮的值继续守着。
 while true; do
   sleep 60
+  . "$MODDIR/lib.sh" 2>/dev/null
   apply_all 0
   date +%s > "$HB" 2>/dev/null
   trim_log

@@ -3,8 +3,9 @@
 # (ZRAM 重建与持久守护在 guard.sh, 由 service.sh 拉起)
 
 # ---------- 内存/回写 ----------
-# ZRAM 6GB 已开, swappiness 取 100: 内存不够优先走压缩池而非直接杀进程
-echo 100 > /proc/sys/vm/swappiness 2>/dev/null || true
+# ZRAM 6GB 已开, swappiness 取 60: 内存不够优先走压缩池而非直接杀进程,
+# 但 100 会把 SystemUI/输入法这类要用也换出去, 触摸时主线程等解压超时
+echo 60 > /proc/sys/vm/swappiness 2>/dev/null || true
 # 脏页回写水位: 攒批量回写, 减少小 IO 抖动
 echo 20 > /proc/sys/vm/dirty_ratio 2>/dev/null || true
 echo 10 > /proc/sys/vm/dirty_background_ratio 2>/dev/null || true
@@ -26,7 +27,7 @@ echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null || true
 echo 65536 > /proc/sys/vm/min_free_kbytes 2>/dev/null || true
 # kswapd 提前介入的额外余量: 原厂 31134 与 min_free 相加仅约 40 MB,
 # 实测 MemFree 掉到 38 MB 才回收, SystemUI 卡在内核页锁导致输入超时黑屏
-echo 196608 > /proc/sys/vm/extra_free_kbytes 2>/dev/null || true
+echo 98304 > /proc/sys/vm/extra_free_kbytes 2>/dev/null || true
 # 越大越少尝试碎片整理(避免无效 compaction 烧 CPU)
 echo 800 > /proc/sys/vm/extfrag_threshold 2>/dev/null || true
 
